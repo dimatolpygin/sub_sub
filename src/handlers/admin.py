@@ -1,11 +1,14 @@
 """Админские хендлеры: замена файла лид-магнита (/setfile)."""
 from __future__ import annotations
 
+from html import escape
+
 from aiogram import Bot, F, Router
 from aiogram.filters import BaseFilter, Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
+from aiogram.utils.text_decorations import html_decoration
 import asyncpg
 
 from .. import repo, texts
@@ -48,16 +51,22 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
 @router.message(StateFilter(SetFile.waiting_for_file), F.document)
 async def receive_file(message: Message, state: FSMContext, pool: asyncpg.Pool) -> None:
     doc = message.document
+    # Сохраняем подпись с форматированием: рендерим entities в HTML (с экранированием).
+    caption_html = (
+        html_decoration.unparse(message.caption, message.caption_entities or [])
+        if message.caption
+        else None
+    )
     await repo.set_lead_magnet(
         pool,
         file_id=doc.file_id,
         file_name=doc.file_name,
-        caption=message.caption,
+        caption=caption_html,
         mime_type=doc.mime_type,
         updated_by=message.from_user.id,
     )
     await state.clear()
-    await message.answer(texts.ADMIN_SETFILE_OK.format(name=doc.file_name or "файл"))
+    await message.answer(texts.ADMIN_SETFILE_OK.format(name=escape(doc.file_name or "файл")))
     logger.info(
         f"🛠 Лид-магнит обновлён: {doc.file_name} (file_id={doc.file_id}) "
         f"админом id={message.from_user.id}"
