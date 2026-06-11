@@ -17,15 +17,18 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncpg
 from redis.asyncio import Redis
 
-from . import repo, texts
+from . import keyboards, repo, texts
 from .config import settings
 from .logger import logger
+from .services.channel import get_channel_url
 from .services.gift import deliver_gift
+from .services.reminders_config import get_reminder_intervals
 from .services.subscription import is_subscribed
 
 
 async def _process_pending(bot: Bot, pool: asyncpg.Pool, redis: Redis) -> None:
-    offsets = settings.reminder_offsets
+    # Расписание читаем из БД (можно менять командой /setreminders без перезапуска).
+    offsets, _ = await get_reminder_intervals(pool)
     max_n = len(offsets)
     now = datetime.now(timezone.utc)
 
@@ -34,6 +37,7 @@ async def _process_pending(bot: Bot, pool: asyncpg.Pool, redis: Redis) -> None:
         return
 
     logger.debug(f"Планировщик: проверяю {len(candidates)} пользователей")
+    channel_url = await get_channel_url(bot)
 
     for row in candidates:
         tg_id = row["tg_id"]
@@ -59,7 +63,11 @@ async def _process_pending(bot: Bot, pool: asyncpg.Pool, redis: Redis) -> None:
         # Не подписан — шлём напоминание.
         is_last = (sent + 1) >= max_n
         try:
-            await bot.send_message(tg_id, texts.REMINDER.format(name="друг"))
+            await bot.send_message(
+                tg_id,
+                texts.REMINDER,
+                reply_markup=keyboards.subscribe_kb(channel_url),
+            )
             await repo.register_reminder(pool, tg_id, done=is_last)
             logger.info(
                 f"🔔→ Напоминание #{sent + 1}/{max_n} отправлено user_id={tg_id}"
@@ -87,8 +95,8 @@ def start_scheduler(bot: Bot, pool: asyncpg.Pool, redis: Redis) -> AsyncIOSchedu
     )
     scheduler.start()
     logger.info(
-        f"✅ Планировщик запущен: проверка каждые {settings.reminder_check_interval_min} мин, "
-        f"напоминаний на пользователя: {len(settings.reminder_offsets)} "
-        f"({settings.reminder_intervals})"
+        f"✅ Планировщик запущен: проверка каждые {settings.reminder_check_interval_min} мин. "
+        f"Расписание по умолчанию: {settings.reminder_intervals} "
+        f"(меняется командой /setreminders, хранится в БД)"
     )
     return scheduler

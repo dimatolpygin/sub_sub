@@ -15,6 +15,7 @@ from redis.asyncio import Redis
 from .. import repo, texts
 from ..config import settings
 from ..logger import logger
+from ..services.reminders_config import get_reminder_intervals, set_reminder_intervals
 
 router = Router()
 
@@ -77,6 +78,42 @@ async def cmd_reset(
 # Если не-админ зовёт /reset — мягко отказываем.
 @router.message(Command("reset"))
 async def cmd_reset_denied(message: Message) -> None:
+    await message.answer(texts.ADMIN_ONLY)
+
+
+@router.message(Command("setreminders"), AdminFilter())
+async def cmd_setreminders(
+    message: Message, command: CommandObject, pool: asyncpg.Pool
+) -> None:
+    """Показать/изменить расписание напоминаний.
+
+    /setreminders             — показать текущее
+    /setreminders 5m,24h,72h  — задать новое (применяется сразу)
+    """
+    if not command.args:
+        offsets, raw = await get_reminder_intervals(pool)
+        await message.answer(
+            texts.ADMIN_REMINDERS_CURRENT.format(value=escape(raw), count=len(offsets))
+        )
+        return
+
+    try:
+        offsets, clean = await set_reminder_intervals(pool, command.args)
+    except ValueError:
+        await message.answer(texts.ADMIN_REMINDERS_BAD)
+        return
+
+    await message.answer(
+        texts.ADMIN_REMINDERS_OK.format(value=escape(clean), count=len(offsets))
+    )
+    logger.info(
+        f"🛠 Расписание напоминаний изменено на '{clean}' админом id={message.from_user.id}"
+    )
+
+
+# Если не-админ зовёт /setreminders — мягко отказываем.
+@router.message(Command("setreminders"))
+async def cmd_setreminders_denied(message: Message) -> None:
     await message.answer(texts.ADMIN_ONLY)
 
 

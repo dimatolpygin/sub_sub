@@ -95,6 +95,25 @@ async def stop_reminders(pool: asyncpg.Pool, tg_id: int) -> None:
     )
 
 
+# ─────────────────────────── Настройки бота ───────────────────────────
+
+async def get_setting(pool: asyncpg.Pool, key: str) -> str | None:
+    row = await pool.fetchrow("SELECT value FROM bot_settings WHERE key = $1", key)
+    return row["value"] if row else None
+
+
+async def set_setting(pool: asyncpg.Pool, key: str, value: str) -> None:
+    await pool.execute(
+        """
+        INSERT INTO bot_settings (key, value, updated_at)
+        VALUES ($1, $2, now())
+        ON CONFLICT (key) DO UPDATE
+            SET value = EXCLUDED.value, updated_at = now()
+        """,
+        key, value,
+    )
+
+
 # ─────────────────────────── Лид-магнит ───────────────────────────
 
 async def get_lead_magnet(pool: asyncpg.Pool) -> asyncpg.Record | None:

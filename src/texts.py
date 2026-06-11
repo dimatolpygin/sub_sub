@@ -48,3 +48,19 @@ ADMIN_RESET_OTHER = "Данные пользователя <code>{id}</code> с�
 ADMIN_RESET_NOT_FOUND = "Пользователь <code>{id}</code> не найден (возможно, уже сброшен)."
 
 ADMIN_RESET_USAGE = "Использование: /reset — сбросить себя, либо /reset &lt;user_id&gt;"
+
+ADMIN_REMINDERS_CURRENT = (
+    "Текущее расписание напоминаний: <code>{value}</code> ({count} шт.).\n\n"
+    "Изменить: <code>/setreminders 5m,24h,72h</code>\n"
+    "Суффиксы: m — минуты, h — часы, d — дни. Кол-во значений = число напоминаний."
+)
+
+ADMIN_REMINDERS_OK = (
+    "Расписание обновлено: <code>{value}</code> ({count} напоминаний).\n"
+    "Применяется сразу, без перезапуска."
+)
+
+ADMIN_REMINDERS_BAD = (
+    "Не понял формат. Пример: <code>/setreminders 30m,12h,2d</code>\n"
+    "Суффиксы: m (минуты), h (часы), d (дни)."
+)
