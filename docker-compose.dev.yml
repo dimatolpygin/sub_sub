@@ -14,8 +14,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
-    ports:
-      - "5432:5432"
+    # Порт на хост не пробрасываем, чтобы не конфликтовать с уже запущенным
+    # локально Postgres. Бот обращается к нему по имени сервиса (postgres:5432).
+    # Нужен доступ с хоста — раскомментируйте и поменяйте левый порт, напр. "55432:5432".
+    # ports:
+    #   - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -26,8 +29,8 @@ services:
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Порт на хост не пробрасываем (конфликт с локальным Redis). Доступ боту —
+    # по имени сервиса (redis:6379). Нужен с хоста — добавьте, напр. "56379:6379".
 
   bot:
     build: .
