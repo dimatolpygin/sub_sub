@@ -4,12 +4,13 @@ from __future__ import annotations
 from html import escape
 
 from aiogram import Bot, F, Router
-from aiogram.filters import BaseFilter, Command, StateFilter
+from aiogram.filters import BaseFilter, Command, CommandObject, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 from aiogram.utils.text_decorations import html_decoration
 import asyncpg
+from redis.asyncio import Redis
 
 from .. import repo, texts
 from ..config import settings
@@ -39,6 +40,43 @@ async def cmd_setfile(message: Message, state: FSMContext) -> None:
 # Если не-админ зовёт /setfile — мягко отказываем.
 @router.message(Command("setfile"))
 async def cmd_setfile_denied(message: Message) -> None:
+    await message.answer(texts.ADMIN_ONLY)
+
+
+@router.message(Command("reset"), AdminFilter())
+async def cmd_reset(
+    message: Message, command: CommandObject, pool: asyncpg.Pool, redis: Redis
+) -> None:
+    """Сброс пользователя для повторного теста сценария с нуля.
+
+    /reset           — сбросить себя
+    /reset 12345     — сбросить пользователя по id
+    """
+    target = message.from_user.id
+    other = False
+    if command.args:
+        arg = command.args.strip()
+        if not arg.lstrip("-").isdigit():
+            await message.answer(texts.ADMIN_RESET_USAGE)
+            return
+        target = int(arg)
+        other = target != message.from_user.id
+
+    existed = await repo.delete_user(pool, target)
+    # Сбрасываем и кеш проверки подписки, чтобы статус перепроверился сразу.
+    await redis.delete(f"sub:{target}")
+
+    if other:
+        text = texts.ADMIN_RESET_OTHER if existed else texts.ADMIN_RESET_NOT_FOUND
+        await message.answer(text.format(id=target))
+    else:
+        await message.answer(texts.ADMIN_RESET_SELF)
+    logger.info(f"🛠 Сброс пользователя id={target} админом id={message.from_user.id}")
+
+
+# Если не-админ зовёт /reset — мягко отказываем.
+@router.message(Command("reset"))
+async def cmd_reset_denied(message: Message) -> None:
     await message.answer(texts.ADMIN_ONLY)
 
 

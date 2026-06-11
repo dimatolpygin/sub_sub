@@ -26,6 +26,16 @@ async def get_user(pool: asyncpg.Pool, tg_id: int) -> asyncpg.Record | None:
     return await pool.fetchrow("SELECT * FROM users WHERE tg_id = $1", tg_id)
 
 
+async def delete_user(pool: asyncpg.Pool, tg_id: int) -> bool:
+    """Полностью удаляет пользователя (для теста сценария с нуля).
+
+    Возвращает True, если запись существовала.
+    """
+    result = await pool.execute("DELETE FROM users WHERE tg_id = $1", tg_id)
+    # asyncpg возвращает строку вида 'DELETE <n>'.
+    return result.split()[-1] != "0"
+
+
 async def mark_subscribed(pool: asyncpg.Pool, tg_id: int) -> None:
     await pool.execute(
         """
