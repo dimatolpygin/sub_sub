@@ -15,6 +15,7 @@ from .handlers import get_main_router
 from .logger import setup_logging
 from .middlewares import LoggingMiddleware
 from .migrator import apply_migrations
+from .scheduler import start_scheduler
 
 
 async def main() -> None:
@@ -41,6 +42,9 @@ async def main() -> None:
     dp.update.middleware(LoggingMiddleware())
     dp.include_router(get_main_router())
 
+    # Планировщик напоминаний и проверки подписок.
+    scheduler = start_scheduler(bot, pool, redis)
+
     try:
         await bot.delete_webhook(drop_pending_updates=True)
         me = await bot.get_me()
@@ -48,6 +52,7 @@ async def main() -> None:
         await dp.start_polling(bot)
     finally:
         log.info("Останавливаю бота...")
+        scheduler.shutdown(wait=False)
         await close_redis()
         await close_pool()
         await bot.session.close()

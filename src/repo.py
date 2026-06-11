@@ -78,6 +78,13 @@ async def register_reminder(pool: asyncpg.Pool, tg_id: int, done: bool) -> None:
     )
 
 
+async def stop_reminders(pool: asyncpg.Pool, tg_id: int) -> None:
+    """Прекращает напоминания без отправки (бот заблокирован или лимит изменён)."""
+    await pool.execute(
+        "UPDATE users SET reminders_done = TRUE WHERE tg_id = $1", tg_id
+    )
+
+
 # ─────────────────────────── Лид-магнит ───────────────────────────
 
 async def get_lead_magnet(pool: asyncpg.Pool) -> asyncpg.Record | None:
