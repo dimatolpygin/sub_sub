@@ -8,6 +8,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 
+from . import __version__
 from .cache import close_redis, init_redis
 from .config import settings
 from .db import close_pool, init_pool
@@ -21,7 +22,7 @@ from .services.channel import get_channel_url
 
 async def main() -> None:
     log = setup_logging(settings.log_level)
-    log.info("⏳ Запуск бота лид-магнита...")
+    log.info(f"⏳ Запуск бота лид-магнита (v{__version__})...")
 
     # Инфраструктура.
     pool = await init_pool()
