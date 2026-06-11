@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Установщик Telegram-бота лид-магнита на Ubuntu (Docker).
-# Postgres 16 и Redis предполагаются уже запущенными в Docker на этом сервере.
+# Установщик Telegram-бота лид-магнита на Ubuntu (Docker, самодостаточный стек).
+# Поднимает бот + свои Postgres и Redis в одном docker-compose.
 # Использование:  bash install.sh
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -32,21 +32,15 @@ INSTALL_DIR=${INSTALL_DIR:-/opt/sub_bot}
 
 promptp "BOT_TOKEN (от @BotFather)" BOT_TOKEN
 prompt  "CHANNEL_ID (@username или -100123456789)" CHANNEL_ID
-prompt  "CHANNEL_URL (ссылка на канал; Enter — собрать из @username)" CHANNEL_URL
+prompt  "CHANNEL_URL (ссылка на канал; Enter — определит сам)" CHANNEL_URL
 prompt  "ADMIN_IDS (id админов через запятую)" ADMIN_IDS
-
-echo ""
-warn "Подключение к УЖЕ работающим Postgres и Redis (в Docker)."
-prompt  "DATABASE_URL [postgresql://postgres:postgres@localhost:5432/postgres]" DATABASE_URL
-DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/postgres}
-prompt  "DB_SCHEMA [sub_bot]" DB_SCHEMA
-DB_SCHEMA=${DB_SCHEMA:-sub_bot}
-prompt  "REDIS_URL [redis://localhost:6379/0]" REDIS_URL
-REDIS_URL=${REDIS_URL:-redis://localhost:6379/0}
 
 echo ""
 prompt  "REMINDER_INTERVALS [1h,24h,72h]" REMINDER_INTERVALS
 REMINDER_INTERVALS=${REMINDER_INTERVALS:-1h,24h,72h}
+
+# Пароль для встроенного Postgres генерируется автоматически.
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
 
 echo ""
 info "Начинаю установку..."
@@ -81,24 +75,29 @@ else
 fi
 
 # ── .env ─────────────────────────────────────────────────────────────────────
+# Если .env уже есть — сохраняем прежний пароль БД, чтобы не потерять доступ к данным.
+if [[ -f .env ]] && grep -q '^POSTGRES_PASSWORD=' .env; then
+  POSTGRES_PASSWORD=$(grep '^POSTGRES_PASSWORD=' .env | head -1 | cut -d= -f2-)
+  warn "Использую существующий POSTGRES_PASSWORD из .env"
+fi
+
 info "Создаю .env..."
 cat > .env <<ENVEOF
 BOT_TOKEN=${BOT_TOKEN}
 CHANNEL_ID=${CHANNEL_ID}
 CHANNEL_URL=${CHANNEL_URL}
 ADMIN_IDS=${ADMIN_IDS}
-DATABASE_URL=${DATABASE_URL}
-DB_SCHEMA=${DB_SCHEMA}
-REDIS_URL=${REDIS_URL}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+DB_SCHEMA=sub_bot
 REMINDER_INTERVALS=${REMINDER_INTERVALS}
-REMINDER_CHECK_INTERVAL_MIN=5
+REMINDER_CHECK_INTERVAL_MIN=1
 SUB_CACHE_TTL=60
 LOG_LEVEL=INFO
 ENVEOF
 chmod 600 .env
 
 # ── Запуск ───────────────────────────────────────────────────────────────────
-info "Собираю и запускаю контейнер..."
+info "Собираю и запускаю стек (бот + Postgres + Redis)..."
 docker compose up -d --build
 
 echo ""
@@ -106,7 +105,7 @@ echo "=========================================================="
 info "Установка завершена!"
 echo ""
 echo "  Каталог:   ${INSTALL_DIR}"
-echo "  Логи:      docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f"
+echo "  Логи:      docker compose -f ${INSTALL_DIR}/docker-compose.yml logs -f bot"
 echo "  Рестарт:   docker compose -f ${INSTALL_DIR}/docker-compose.yml restart"
 echo "  Стоп:      docker compose -f ${INSTALL_DIR}/docker-compose.yml down"
 echo ""

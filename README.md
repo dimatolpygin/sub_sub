@@ -10,10 +10,10 @@
 ## Стек
 
 - Python 3.12 + [aiogram 3](https://docs.aiogram.dev) (long polling, без вебхука)
-- PostgreSQL 16 — отдельная схема (`sub_bot`), существующие таблицы не затрагиваются
+- PostgreSQL 16 — выделенная схема (`sub_bot`)
 - Redis — FSM-состояния и кеш проверки подписки
 - APScheduler — планировщик напоминаний и проверки подписок (замена крона)
-- Docker + docker compose
+- Docker + docker compose — самодостаточный стек (бот + Postgres + Redis в одном compose)
 - GitHub Actions — автодеплой по push в `master`
 
 ## Как это работает
@@ -54,14 +54,14 @@
 | `BOT_TOKEN`                   | да          | Токен бота от [@BotFather](https://t.me/BotFather) |
 | `CHANNEL_ID`                  | да          | Канал для проверки: `@username` или `-100123456789` |
 | `CHANNEL_URL`                 | нет         | Ссылка для кнопки «Подписаться». Для `@username` собирается автоматически; для приватного канала укажите инвайт-ссылку |
-| `ADMIN_IDS`                   | да          | ID админов через запятую (доступ к `/setfile`). Узнать свой id: [@userinfobot](https://t.me/userinfobot) |
-| `DATABASE_URL`                | да          | DSN существующего Postgres |
+| `ADMIN_IDS`                   | да          | ID админов через запятую (доступ к `/admin`, `/setfile`, `/setreminders`, `/reset`). Узнать свой id: [@userinfobot](https://t.me/userinfobot) |
+| `POSTGRES_PASSWORD`           | да          | Пароль встроенного Postgres (в `install.sh` генерируется сам) |
 | `DB_SCHEMA`                   | нет         | Схема под бот (по умолчанию `sub_bot`, создаётся сама) |
-| `REDIS_URL`                   | нет         | По умолчанию `redis://localhost:6379/0` |
 | `REMINDER_INTERVALS`          | нет         | Список интервалов от `/start` через запятую. Кол-во = число напоминаний. Суффиксы: `m`/`h`/`d`. По умолчанию `1h,24h,72h` |
-| `REMINDER_CHECK_INTERVAL_MIN` | нет         | Период опроса планировщика, мин (по умолчанию `5`) |
+| `REMINDER_CHECK_INTERVAL_MIN` | нет         | Период опроса планировщика, мин (по умолчанию `1`) |
 | `SUB_CACHE_TTL`               | нет         | TTL кеша подписки, сек (по умолчанию `60`) |
 | `LOG_LEVEL`                   | нет         | `DEBUG`/`INFO`/`WARNING`/`ERROR` |
+| `DATABASE_URL` / `REDIS_URL`  | нет         | Нужны только при запуске **без Docker**. В docker-compose подставляются автоматически |
 
 ### Про напоминания
 
@@ -92,18 +92,14 @@
 
 ### Через Docker (рекомендуется)
 
-Postgres и Redis уже должны работать (в вашем случае — в Docker на сервере).
+Ничего, кроме Docker, ставить не нужно — `docker-compose.yml` поднимает бот вместе с
+Postgres и Redis. Данные хранятся в именованных томах и переживают рестарт.
 
 ```bash
-cp .env.example .env   # заполнить
+cp .env.example .env   # заполнить BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, POSTGRES_PASSWORD
 docker compose up -d --build
-docker compose logs -f
+docker compose logs -f bot
 ```
-
-`network_mode: host` в `docker-compose.yml` позволяет боту достучаться до
-Postgres/Redis по `localhost`, если их порты опубликованы на хост. Если Postgres/Redis
-доступны только во внутренней docker-сети — см. комментарии в `docker-compose.yml`
-(подключение бота к внешней сети по имени).
 
 ### Локально (без Docker)
 

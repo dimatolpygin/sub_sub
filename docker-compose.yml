@@ -1,25 +1,46 @@
-# Запускается ТОЛЬКО бот. Postgres и Redis уже работают в Docker на сервере.
+# Продакшен: самодостаточный стек — бот + свои Postgres и Redis.
+# Данные БД и Redis сохраняются в именованных томах, всё перезапускается автоматически.
 #
-# network_mode: host — контейнер использует сеть хоста, поэтому достучаться до
-# существующих Postgres/Redis можно по localhost (если их порты 5432/6379
-# опубликованы на хост). DATABASE_URL и REDIS_URL берутся из .env.
-#
-# Если Postgres/Redis НЕ публикуют порты на хост, а доступны только во внутренней
-# docker-сети — уберите network_mode и подключите бота к той сети (см. README).
+# Перед запуском заполните .env (минимум BOT_TOKEN, CHANNEL_ID, ADMIN_IDS, POSTGRES_PASSWORD).
+# Запуск:  docker compose up -d --build
+# Логи:    docker compose logs -f bot
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
   bot:
     build: .
-    container_name: sub_bot
     restart: unless-stopped
     env_file: .env
-    network_mode: host
-    # Если используете внутреннюю docker-сеть вместо host — закомментируйте
-    # network_mode выше и раскомментируйте блок ниже, указав имя сети:
-    # networks:
-    #   - infra
-    # И пропишите в .env DATABASE_URL/REDIS_URL с именами контейнеров pg/redis.
+    # Внутренние адреса БД/Redis — по именам сервисов. Переопределяют значения из .env.
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-postgres}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
-# networks:
-#   infra:
-#     external: true
+volumes:
+  pgdata:
+  redisdata:
