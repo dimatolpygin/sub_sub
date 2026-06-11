@@ -1,0 +1,8 @@
+# Принудительно LF для всех текстовых файлов (важно для запуска на Linux-сервере).
+* text=auto eol=lf
+
+# Бинарники не трогать.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.zip binary
