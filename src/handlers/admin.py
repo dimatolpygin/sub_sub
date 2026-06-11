@@ -31,6 +31,17 @@ class SetFile(StatesGroup):
     waiting_for_file = State()
 
 
+@router.message(Command("admin"), AdminFilter())
+async def cmd_admin(message: Message) -> None:
+    await message.answer(texts.ADMIN_HELP)
+
+
+# Если не-админ зовёт /admin — мягко отказываем.
+@router.message(Command("admin"))
+async def cmd_admin_denied(message: Message) -> None:
+    await message.answer(texts.ADMIN_ONLY)
+
+
 @router.message(Command("setfile"), AdminFilter())
 async def cmd_setfile(message: Message, state: FSMContext) -> None:
     await state.set_state(SetFile.waiting_for_file)
