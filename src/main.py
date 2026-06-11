@@ -4,8 +4,6 @@ from __future__ import annotations
 import asyncio
 
 from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
 from aiogram.fsm.storage.redis import RedisStorage
 
 from .cache import close_redis, init_redis
@@ -28,11 +26,10 @@ async def main() -> None:
     redis = await init_redis()
 
     # Бот и диспетчер. FSM-состояния храним в Redis.
+    # parse_mode не задаём: сообщения — обычный текст, имена пользователей могут
+    # содержать <, >, & и сломали бы разметку.
     storage = RedisStorage.from_url(settings.redis_url)
-    bot = Bot(
-        token=settings.bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
+    bot = Bot(token=settings.bot_token)
     dp = Dispatcher(storage=storage)
 
     # Зависимости, доступные во всех хендлерах как аргументы pool / redis.
